@@ -96,7 +96,7 @@ Market Agent (port 8001)              Trader Agent (port 8002)
   LLM designs games                     discovers markets via registry
   runs scheduled game rounds            LLM evaluates odds, places bids
   commits outcome before bids open      verifies fairness after each result
-  reveals seed after resolution         blacklists and reports cheating markets
+  reveals seed after resolution         blacklists cheating markets locally
          |                                        |
          └──────────── A2A / JSON-RPC ────────────┘
                                |
@@ -414,7 +414,7 @@ hash_ok    = verify(server_seed, committed_hash)
 outcome_ok = resolve_run(server_seed, num_outcomes) == reported_outcome_index
 ```
 
-If either check fails: the market is blacklisted locally, reported to the registry, and marked blacklisted network-wide — all other traders stop bidding there.
+If either check fails: the market is blacklisted locally — that trader stops bidding there for the rest of its process lifetime.
 
 To verify any result manually:
 
@@ -445,7 +445,6 @@ server_seed → HMAC-SHA256(key=server_seed, msg="a2a:outcome:\x00\x00\x00\x00")
 | `/markets` | GET | All registered market agents |
 | `/traders` | GET | All registered trader agents |
 | `/register` | POST | Register or heartbeat |
-| `/report` | POST | Report a cheating market |
 | `/pubkey` | GET | Registry's Ed25519 public key |
 
 ### Market — `http://localhost:8001`

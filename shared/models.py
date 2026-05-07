@@ -108,7 +108,6 @@ class StatsResponse(BaseModel):
     total_wagered: float
     total_paid_out: float
     active_games: int = 0
-    blacklisted: bool = False
 
 
 class RegistryEntry(BaseModel):
@@ -118,7 +117,6 @@ class RegistryEntry(BaseModel):
     last_heartbeat: datetime
     public_key: str = ""
     registry_signature: str = ""
-    blacklisted: bool = False
 
 
 

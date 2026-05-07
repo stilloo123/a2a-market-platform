@@ -83,15 +83,12 @@ async def register(req: RegisterRequest, request: Request):
         raise HTTPException(status_code=401, detail="Invalid agent signature")
 
     now = datetime.now(timezone.utc).isoformat()
-    # Preserve existing blacklist status on re-registration (heartbeat)
-    existing = _agents.get(req.url, {})
     entry = {
         "url": req.url,
         "name": req.name,
         "type": req.type.value,
         "public_key": req.public_key,
         "last_heartbeat": now,
-        "blacklisted": existing.get("blacklisted", False),
     }
     entry["registry_signature"] = sign(
         _priv_key,
