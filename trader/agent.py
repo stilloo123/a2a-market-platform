@@ -6,7 +6,6 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-import httpx
 import uvicorn
 import yaml
 from dotenv import load_dotenv
@@ -59,30 +58,6 @@ def build_app(cfg: dict) -> FastAPI:
     # task_id → {market_url, run_id, server_seed_hash, outcome_index, bet_amount, num_outcomes}
     pending_tasks: dict[str, dict] = {}
     market_pubkeys: dict[str, bytes] = {}  # market_url → Ed25519 public key bytes
-
-    async def _send_report(market_url: str, task_id: str, reason: str) -> None:
-        timestamp = datetime.now(timezone.utc).isoformat()
-        payload = canonical_bytes({
-            "url": market_url,
-            "task_id": task_id,
-            "reason": reason,
-            "reporter_url": self_url,
-            "timestamp": timestamp,
-        })
-        sig = sign(priv_key, payload).hex()
-        try:
-            async with httpx.AsyncClient() as client:
-                for reg_url in registry_urls:
-                    await client.post(f"{reg_url}/report", json={
-                        "url": market_url,
-                        "task_id": task_id,
-                        "reason": reason,
-                        "reporter_url": self_url,
-                        "timestamp": timestamp,
-                        "signature": sig,
-                    })
-        except Exception:
-            pass
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -308,7 +283,6 @@ def build_app(cfg: dict) -> FastAPI:
                             reason = "invalid market result signature"
                             print(f"[trader] CHEAT DETECTED at {info['market_url']} ({reason}) — blacklisting")
                             ledger.blacklist(info["market_url"])
-                            await _send_report(info["market_url"], task_id, reason)
                             del pending_tasks[task_id]
                             continue
 
@@ -323,7 +297,6 @@ def build_app(cfg: dict) -> FastAPI:
                         reason = "hash mismatch" if not hash_ok else "outcome mismatch — market lied"
                         print(f"[trader] CHEAT DETECTED at {info['market_url']} ({reason}) — blacklisting")
                         ledger.blacklist(info["market_url"])
-                        await _send_report(info["market_url"], task_id, reason)
                         del pending_tasks[task_id]
                         continue
 

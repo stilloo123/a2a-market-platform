@@ -7,11 +7,10 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
-from shared.models import AgentType, ReportRequest
+from shared.models import AgentType
 from shared.crypto import canonical_bytes, load_or_create_keypair, sign, verify_sig
 
 _agents: dict[str, dict] = {}
-_reports: list[dict] = []
 _register_times: dict[str, list[datetime]] = defaultdict(list)
 _REGISTER_LIMIT = 10   # max registrations per IP per minute
 
@@ -119,60 +118,6 @@ async def list_all():
     _evict_stale()
     return list(_agents.values())
 
-
-@app.post("/report")
-async def report(req: ReportRequest):
-    # Verify timestamp freshness
-    try:
-        ts = datetime.fromisoformat(req.timestamp)
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
-        if abs((datetime.now(timezone.utc) - ts).total_seconds()) > 300:
-            raise HTTPException(status_code=400, detail="Timestamp too old")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid timestamp format")
-
-    # Reporter must be a currently registered agent
-    reporter_entry = _agents.get(req.reporter_url)
-    if not reporter_entry:
-        raise HTTPException(status_code=403, detail="Reporter is not a registered agent")
-
-    try:
-        sig_bytes = bytes.fromhex(req.signature)
-        pub_bytes = bytes.fromhex(reporter_entry["public_key"])
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid hex in signature")
-
-    payload = canonical_bytes({
-        "url": req.url,
-        "task_id": req.task_id,
-        "reason": req.reason,
-        "reporter_url": req.reporter_url,
-        "timestamp": req.timestamp,
-    })
-    if not verify_sig(pub_bytes, payload, sig_bytes):
-        raise HTTPException(status_code=401, detail="Invalid reporter signature")
-
-    _reports.append({
-        "url": req.url,
-        "task_id": req.task_id,
-        "reason": req.reason,
-        "reporter_url": req.reporter_url,
-        "reported_at": datetime.now(timezone.utc).isoformat(),
-    })
-    if req.url in _agents:
-        entry = _agents[req.url]
-        entry["blacklisted"] = True
-        entry["registry_signature"] = sign(
-            _priv_key,
-            canonical_bytes({k: v for k, v in entry.items() if k != "registry_signature"}),
-        ).hex()
-    return {"status": "reported", "total_reports": len(_reports)}
-
-
-@app.get("/reports")
-async def list_reports():
-    return _reports
 
 
 @app.get("/health")
