@@ -27,7 +27,7 @@ def load_config(path: str) -> dict:
 
 
 def build_app(cfg: dict) -> FastAPI:
-    _cache: dict = {"stats": [], "schedule": []}
+    _cache: dict = {"stats": [], "schedule": [], "agent_urls": set()}
     registry_urls: list[str] = cfg["registry_urls"]
 
     async def _collect() -> list[StatsResponse]:
@@ -39,6 +39,8 @@ def build_app(cfg: dict) -> FastAPI:
         except Exception as exc:
             print(f"[observer] registry error: {exc}")
             return all_stats
+
+        _cache["agent_urls"] = set(urls)
 
         async def fetch(url: str):
             try:
@@ -138,6 +140,9 @@ def build_app(cfg: dict) -> FastAPI:
     @app.get("/proxy/thoughts")
     async def proxy_thoughts(url: str = Query(...), n: int = 20):
         """Proxy agent /thoughts to avoid browser CORS blocks."""
+        from fastapi import HTTPException
+        if url not in _cache["agent_urls"]:
+            raise HTTPException(status_code=403, detail="URL not in known agent list")
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{url}/thoughts", params={"n": n})
             return resp.json()

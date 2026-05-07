@@ -343,22 +343,23 @@ def build_app(cfg: dict) -> FastAPI:
             if skill_id not in active_game_ids:
                 return err(-32601, f"Unknown skill: {skill_id}")
 
-            # Verify trader signature if provided
+            # Require trader signature on every bid
             trader_pubkey_hex = data.get("trader_pubkey", "")
             trader_sig_hex = data.get("trader_signature", "")
-            if trader_pubkey_hex and trader_sig_hex:
-                bid_data = {k: v for k, v in data.items()
-                            if k not in ("trader_pubkey", "trader_signature", "skill_id")}
-                try:
-                    valid = verify_sig(
-                        bytes.fromhex(trader_pubkey_hex),
-                        canonical_bytes(bid_data),
-                        bytes.fromhex(trader_sig_hex),
-                    )
-                except Exception:
-                    valid = False
-                if not valid:
-                    return err(-32000, "Invalid trader signature")
+            if not trader_pubkey_hex or not trader_sig_hex:
+                return err(-32000, "Missing trader_pubkey or trader_signature")
+            bid_data = {k: v for k, v in data.items()
+                        if k not in ("trader_pubkey", "trader_signature", "skill_id")}
+            try:
+                valid = verify_sig(
+                    bytes.fromhex(trader_pubkey_hex),
+                    canonical_bytes(bid_data),
+                    bytes.fromhex(trader_sig_hex),
+                )
+            except Exception:
+                valid = False
+            if not valid:
+                return err(-32000, "Invalid trader signature")
 
             try:
                 bid_req = BidRequest.model_validate(data)

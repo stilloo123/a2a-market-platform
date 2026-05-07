@@ -122,9 +122,12 @@ class RegistryEntry(BaseModel):
 
 
 class ReportRequest(BaseModel):
-    url: str
+    url: str            # URL of the agent being reported
     task_id: str
     reason: str
+    reporter_url: str   # reporter's registered URL (used to look up their public key)
+    timestamp: str      # ISO UTC — prevents replay
+    signature: str      # Ed25519 sig over canonical_bytes({url, task_id, reason, reporter_url, timestamp})
 
 
 _camel = ConfigDict(alias_generator=to_camel, populate_by_name=True)

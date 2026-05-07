@@ -1,9 +1,10 @@
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 from shared.models import AgentType, ReportRequest
@@ -11,6 +12,8 @@ from shared.crypto import canonical_bytes, load_or_create_keypair, sign, verify_
 
 _agents: dict[str, dict] = {}
 _reports: list[dict] = []
+_register_times: dict[str, list[datetime]] = defaultdict(list)
+_REGISTER_LIMIT = 10   # max registrations per IP per minute
 
 STALE_AFTER_SECONDS = 180  # 3 missed heartbeats at 60s interval
 
@@ -44,7 +47,16 @@ async def pubkey():
 
 
 @app.post("/register")
-async def register(req: RegisterRequest):
+async def register(req: RegisterRequest, request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=60)
+    times = _register_times[client_ip]
+    _register_times[client_ip] = [t for t in times if t > cutoff]
+    if len(_register_times[client_ip]) >= _REGISTER_LIMIT:
+        raise HTTPException(status_code=429, detail="Too many registrations — try again later")
+    _register_times[client_ip].append(now)
+
     try:
         ts = datetime.fromisoformat(req.timestamp)
         if ts.tzinfo is None:
@@ -110,10 +122,42 @@ async def list_all():
 
 @app.post("/report")
 async def report(req: ReportRequest):
+    # Verify timestamp freshness
+    try:
+        ts = datetime.fromisoformat(req.timestamp)
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if abs((datetime.now(timezone.utc) - ts).total_seconds()) > 300:
+            raise HTTPException(status_code=400, detail="Timestamp too old")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid timestamp format")
+
+    # Reporter must be a currently registered agent
+    reporter_entry = _agents.get(req.reporter_url)
+    if not reporter_entry:
+        raise HTTPException(status_code=403, detail="Reporter is not a registered agent")
+
+    try:
+        sig_bytes = bytes.fromhex(req.signature)
+        pub_bytes = bytes.fromhex(reporter_entry["public_key"])
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid hex in signature")
+
+    payload = canonical_bytes({
+        "url": req.url,
+        "task_id": req.task_id,
+        "reason": req.reason,
+        "reporter_url": req.reporter_url,
+        "timestamp": req.timestamp,
+    })
+    if not verify_sig(pub_bytes, payload, sig_bytes):
+        raise HTTPException(status_code=401, detail="Invalid reporter signature")
+
     _reports.append({
         "url": req.url,
         "task_id": req.task_id,
         "reason": req.reason,
+        "reporter_url": req.reporter_url,
         "reported_at": datetime.now(timezone.utc).isoformat(),
     })
     if req.url in _agents:
