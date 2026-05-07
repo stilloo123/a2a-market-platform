@@ -1,0 +1,13 @@
+model: anthropic/claude-sonnet-4-6   # anthropic/... uses Anthropic SDK; anything else uses OpenAI SDK
+# api_base: http://localhost:11434/v1  # uncomment for local models (Ollama, vLLM, LM Studio)
+# api_key: ollama                      # placeholder key for local servers that don't validate it
+seed_balance: 50.0
+agents_md: trader/AGENTS.md
+risk_profile: moderate
+market_urls: []
+registry_urls:
+  - http://localhost:8000
+bet_delay_seconds: 60          # overridden by BET_DELAY_SECONDS in .env
+discovery_interval_seconds: 60  # overridden by DISCOVERY_INTERVAL_SECONDS in .env
+port: 8002
+name: "My Trader"

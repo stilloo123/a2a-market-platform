@@ -1,0 +1,4 @@
+registry_urls:
+  - http://localhost:8000
+poll_interval_seconds: 30
+port: 8080
