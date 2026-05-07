@@ -28,7 +28,7 @@ class Brain(ABC):
 
 class DefaultMarketBrain(Brain):
 
-    def design_initial_games(self, balance: float) -> list[GameSpec]:
+    def design_initial_games(self, balance: float) -> tuple[str, list[GameSpec]]:
         prompt = (
             f"You are starting a market with ${balance:.2f}. Design your opening game portfolio.\n\n"
             "PROTOCOL RULES (these are hard constraints, not guidelines):\n"
@@ -53,8 +53,6 @@ class DefaultMarketBrain(Brain):
         return self._call_for_games(prompt)
 
     def should_adapt(self, stats: dict, silence_minutes: float) -> bool:
-        if silence_minutes < 5:
-            return False
         prompt = (
             f"Market stats: {json.dumps(stats, indent=2)}\n"
             f"No bids for {silence_minutes:.1f} minutes. "

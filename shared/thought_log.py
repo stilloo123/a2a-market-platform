@@ -3,6 +3,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+_MAX_BYTES = 50 * 1024 * 1024  # 50 MB — trim to last half when exceeded
+
 
 class ThoughtLog:
     def __init__(self, agent_name: str, log_dir: str = "logs"):
@@ -19,6 +21,9 @@ class ThoughtLog:
         }
         if data:
             entry["data"] = data
+        if self._path.exists() and self._path.stat().st_size > _MAX_BYTES:
+            lines = self._path.read_text().strip().splitlines()
+            self._path.write_text("\n".join(lines[len(lines) // 2:]) + "\n")
         with open(self._path, "a") as f:
             f.write(json.dumps(entry) + "\n")
 

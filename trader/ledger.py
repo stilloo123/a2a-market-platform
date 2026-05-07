@@ -46,6 +46,11 @@ class TraderLedger:
     def total_paid_out(self) -> float:
         return sum(b.payout for b in self.bets)
 
-    def recent_losses(self, n: int = 3) -> int:
-        recent = self.bets[-n:]
-        return sum(1 for b in recent if not b.trader_won)
+    def recent_losses(self) -> int:
+        count = 0
+        for b in reversed(self.bets):
+            if not b.trader_won:
+                count += 1
+            else:
+                break
+        return count

@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+from contextlib import asynccontextmanager
 
 import httpx
 import uvicorn
@@ -26,7 +27,6 @@ def load_config(path: str) -> dict:
 
 
 def build_app(cfg: dict) -> FastAPI:
-    app = FastAPI(title="A2A Market Platform Observer")
     _cache: dict = {"stats": [], "schedule": []}
     registry_urls: list[str] = cfg["registry_urls"]
 
@@ -87,9 +87,12 @@ def build_app(cfg: dict) -> FastAPI:
             _cache["schedule"] = schedule
             await asyncio.sleep(cfg.get("poll_interval_seconds", 30))
 
-    @app.on_event("startup")
-    async def startup():
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
         asyncio.create_task(_poll_loop())
+        yield
+
+    app = FastAPI(title="A2A Market Platform Observer", lifespan=lifespan)
 
     @app.get("/.well-known/agent-card.json")
     async def a2a_agent_card():

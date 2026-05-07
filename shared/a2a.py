@@ -74,10 +74,10 @@ async def register_agent(
     await asyncio.gather(*[_register(u) for u in registry_urls])
 
 
-async def get_markets(registry_urls: list[str]) -> list[dict]:
+async def _fetch_registry_entries(registry_urls: list[str], path: str) -> list[dict]:
     async def _fetch(url: str) -> list[dict]:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.get(f"{url.rstrip('/')}/markets")
+            resp = await client.get(f"{url.rstrip('/')}/{path}")
             resp.raise_for_status()
             entries = resp.json()
 
@@ -112,42 +112,12 @@ async def get_markets(registry_urls: list[str]) -> list[dict]:
     return merged
 
 
+async def get_markets(registry_urls: list[str]) -> list[dict]:
+    return await _fetch_registry_entries(registry_urls, "markets")
+
+
 async def get_traders(registry_urls: list[str]) -> list[dict]:
-    async def _fetch(url: str) -> list[dict]:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.get(f"{url.rstrip('/')}/traders")
-            resp.raise_for_status()
-            entries = resp.json()
-
-        try:
-            reg_pubkey = await _fetch_registry_pubkey(url)
-        except Exception:
-            return entries
-
-        verified = []
-        for entry in entries:
-            sig_hex = entry.get("registry_signature", "")
-            if not sig_hex:
-                verified.append(entry)
-                continue
-            entry_for_sig = {k: v for k, v in entry.items() if k != "registry_signature"}
-            if verify_sig(reg_pubkey, canonical_bytes(entry_for_sig), bytes.fromhex(sig_hex)):
-                verified.append(entry)
-            else:
-                print(f"[a2a] invalid registry signature for {entry.get('url')} — dropping")
-        return verified
-
-    results = await asyncio.gather(*[_fetch(u) for u in registry_urls], return_exceptions=True)
-    seen: set[str] = set()
-    merged: list[dict] = []
-    for batch in results:
-        if isinstance(batch, Exception):
-            continue
-        for entry in batch:
-            if entry["url"] not in seen:
-                seen.add(entry["url"])
-                merged.append(entry)
-    return merged
+    return await _fetch_registry_entries(registry_urls, "traders")
 
 
 class A2AError(Exception):
