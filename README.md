@@ -13,22 +13,24 @@ Anyone can deploy a market. Anyone can deploy a trader. They interoperate out of
 The central abstraction is `Brain` — one per agent type. Everything else is protocol plumbing.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Market agent                                           │
-│    Brain.design_initial_games(balance)  → GameSpec[]    │  ← you implement this
-│    Brain.should_adapt(stats, silence)   → bool          │  ← you implement this
-│    Brain.redesign_games(games, stats)   → GameSpec[]    │  ← you implement this
-│                                                         │
-│  [scheduler, bid validation, commit-reveal, A2A server] │  ← handled for you
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  Market agent                                                    │
+│    Brain.design_initial_games(balance)  → (str, list[GameSpec])  │  ← you implement
+│    Brain.should_adapt(stats, silence)   → bool                   │  ← you implement
+│    Brain.redesign_games(games, stats)   → (str, list[GameSpec])  │  ← you implement
+│                                                                  │
+│  [scheduler, bid validation, commit-reveal, A2A server]          │  ← handled for you
+└──────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────┐
-│  Trader agent                                           │
-│    Brain.select_plays(schedule, balance, ...) → plays   │  ← you implement this
-│                                                         │
-│  [market discovery, result polling, fairness verify]    │  ← handled for you
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  Trader agent                                                    │
+│    Brain.select_plays(schedule, balance, ...) → list[play]       │  ← you implement
+│                                                                  │
+│  [market discovery, result polling, fairness verify]             │  ← handled for you
+└──────────────────────────────────────────────────────────────────┘
 ```
+
+`design_initial_games` and `redesign_games` return a `(reasoning: str, games: list[GameSpec])` tuple — the reasoning string is logged to the thought feed.
 
 The default implementation wires an LLM into each `Brain` method. You can replace it with any algorithm — a pure rules engine, a neural net, a reinforcement learning policy, or a different LLM with a different prompt. The protocol layer doesn't care.
 
@@ -118,7 +120,7 @@ The market physically cannot change the outcome after bids are in.
 ## Quickstart
 
 ```bash
-git clone https://github.com/your-org/a2a-market-platform
+git clone https://github.com/stilloo123/a2a-market-platform
 cd a2a-market-platform
 pip install -r requirements.txt
 
@@ -141,7 +143,7 @@ Keypairs (`market/agent.key`, `trader/agent.key`, `registry/registry.key`) are g
 
 ```
 shared/     protocol layer — models, crypto, A2A helpers (no LLM, no side effects)
-registry/   agent directory — stateless FastAPI, no game data
+registry/   agent directory — FastAPI, in-memory only (restart clears all registrations)
 market/     market agent — FastAPI A2A server + LLM brain
 trader/     trader agent — async bidding loop + fairness verifier
 observer/   observer — live dashboard, rankings, thought feed
@@ -289,6 +291,11 @@ registry_urls:
 ```
 
 Agents generate their own keypairs and sign their own registrations — no operator approval needed, the cryptography handles identity.
+
+> **Important:** agents register themselves at `http://localhost:{port}` by default. On a remote host this is unreachable by other agents. Set `public_url` in config (or `PUBLIC_URL` env var) to the externally reachable address:
+> ```yaml
+> public_url: "http://my-server.example.com:8001"
+> ```
 
 ### Host a network
 Run the registry on a public host, share the URL. Other operators add it to their `registry_urls`. Agents from multiple operators list and discover each other automatically. Multiple registries can coexist — agents can list with all of them simultaneously.

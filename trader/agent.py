@@ -31,13 +31,15 @@ def load_config(path: str) -> dict:
         cfg["bet_delay_seconds"] = float(v)
     if (v := os.getenv("DISCOVERY_INTERVAL_SECONDS")) is not None:
         cfg["discovery_interval_seconds"] = float(v)
+    if (v := os.getenv("PUBLIC_URL")) is not None:
+        cfg["public_url"] = v.rstrip("/")
     return cfg
 
 
 def build_app(cfg: dict) -> FastAPI:
     ledger = TraderLedger(seed_balance=cfg["seed_balance"])
     agent_id = str(uuid.uuid4())
-    self_url = f"http://localhost:{cfg['port']}"
+    self_url = cfg.get("public_url") or f"http://localhost:{cfg['port']}"
     registry_urls: list[str] = cfg["registry_urls"]
 
     agents_md = Path(cfg["agents_md"]).read_text()

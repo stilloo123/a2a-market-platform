@@ -49,6 +49,8 @@ def load_config(path: str) -> dict:
         cfg["registry_urls"] = [u.strip() for u in v.split(",") if u.strip()]
     if (v := os.getenv("ADAPTATION_SILENCE_MINUTES")) is not None:
         cfg["adaptation_silence_minutes"] = float(v)
+    if (v := os.getenv("PUBLIC_URL")) is not None:
+        cfg["public_url"] = v.rstrip("/")
     return cfg
 
 
@@ -56,7 +58,7 @@ def build_app(cfg: dict) -> FastAPI:
     ledger = MarketLedger(seed_balance=cfg["seed_balance"])
     engine = GameEngine()
     agent_id = str(uuid.uuid4())
-    self_url = f"http://localhost:{cfg['port']}"
+    self_url = cfg.get("public_url") or f"http://localhost:{cfg['port']}"
     registry_urls: list[str] = cfg["registry_urls"]
     priv_key, pub_key = load_or_create_keypair(Path("market/agent"))
 

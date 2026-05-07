@@ -11,3 +11,4 @@ bet_delay_seconds: 60          # overridden by BET_DELAY_SECONDS in .env
 discovery_interval_seconds: 60  # overridden by DISCOVERY_INTERVAL_SECONDS in .env
 port: 8002
 name: "My Trader"
+# public_url: "http://my-server.example.com:8002"  # set this when running on a remote host

@@ -8,3 +8,4 @@ registry_urls:
   - http://localhost:8000
 port: 8001
 name: "My Market"
+# public_url: "http://my-server.example.com:8001"  # set this when running on a remote host
